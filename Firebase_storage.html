@@ -1,0 +1,178 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Save and Load Image on Firebase Storage</title>
+
+    <style>
+        img{
+            height: 200px;
+            width: 200px;
+            border: 2px black solid;
+        }
+    </style>
+
+</head>
+<body>
+    
+    <label>Image Name</label> <input type="text" id="namebox"> <label id="extlab"></label><br><br>
+    <img id="myimage"><label id="upprogr ess"></label><br><br>
+
+    <button id="selbtn">Select Image</button>
+    <button id="upbtn">Upload Image</button>
+    <button id="downbtn">Retrieve Image</button>
+
+    <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyDeKbMGAUSqNaduX61KJtAXoNvCELb0Wqg",
+    authDomain: "fir-9js-26bf8.firebaseapp.com",
+    databaseURL: "https://fir-9js-26bf8-default-rtdb.firebaseio.com",
+    projectId: "fir-9js-26bf8",
+    storageBucket: "fir-9js-26bf8.appspot.com",
+    messagingSenderId: "381908662378",
+    appId: "1:381908662378:web:91c5fa208d3cbebad8f213"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+        import{getStorage, ref as sRef , uploadBytesResumable, getDownloadURL} //importing libraries, ref as sRef to avoid ambiguity
+        from "https://www.gstatic.com/firebasejs/9.13.0/firebase-storage.js"
+
+        // Firebase Realtime database
+        import {getDatabase, ref, set, child, get,update,remove }
+        from "https://www.gstatic.com/firebasejs/9.13.0/firebase-database.js"
+        const realdb = getDatabase();
+
+//---------------------------VARIABLES AND REFERENCE----------------------------------------
+var files = [];
+var reader = new FileReader(); //reads our file when we will be selecting our image
+
+var namebox = document.getElementById('namebox');
+var extlab = document.getElementById('extlab');
+var myimage = document.getElementById('myimage');
+var proglab = document.getElementById('upprogress');
+var Selbtn = document.getElementById('selbtn');
+var Upbtn = document.getElementById('upbtn');
+var Downbtn = document.getElementById('downbtn');
+
+var input = document.createElement('input'); //whenever we click the select button it will allow the user to select an image
+input.type = 'file';
+ 
+//Does something whenever an image is selected
+input.onchange = e =>{  //event of onchange
+    files = e.target.files; //returns an array that is why we are using the array o,Files selected by the user 
+
+    var extension = GetFileExt(files[0]);  
+    var name = GetFileName(files[0]);
+
+    // when the name is extracted, it is assigned to the name box
+    namebox.value = name;
+    extlab.innerHTML = extension;
+
+    reader.readAsDataURL(files[0]); //the reader reads the file as url
+}
+
+// whenever the reader reads the file it has to be assigned to the image element
+reader.onload = function(){
+    myimage.src  = reader.result; //the reader goes inside the image source and the displays the image
+}
+
+
+//-----------------SELECTION-----------------------------------------------------------------
+
+Selbtn.onclick = function(){
+    input.click();
+}
+
+function GetFileExt(file){
+    var temp = file.name.split('.');
+    var ext = temp.slice((temp.length-1),(temp.length));
+    return '.' + ext[0];
+}
+function GetFileName(file){
+    var temp = file.name.split('.');
+    var fname = temp.slice(0,-1).join('.'); //temp.slice takes the last element of that array
+    return fname; 
+}
+
+//------------------------UPLOAD PROCESS---------------------------------------------------------
+
+async function UploadProcess(){
+    var ImgToUpload = files[0];
+    var ImgName = namebox.value +  extlab.innerHTML; // gets the combined name of the image with its extensions
+
+    if(!validateName()){
+        alert('name cannot contain ".", "#", "$", "[", or "]"');
+    }
+
+    const metaData ={
+        contentType: ImgToUpload.type //type from the image upload
+    }
+
+    const storage = getStorage(); 
+
+    const storageRef = sRef(storage,"Images/"+ImgName);
+
+    const UploadTask = uploadBytesResumable(storageRef, ImgToUpload, metaData);
+
+    UploadTask.on('state-changed', (snapshot)=>{
+        var progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100; // given in the firebase documentation to calculate the percentage of the files upload
+        proglab.innerHTML = "Upload" + progress + "%";
+    },
+
+    (error) =>{
+        alert(" error: image not uploaded!");
+    },
+//if the image is successfully uploaded
+    ()=>{
+        getDownloadURL(UploadTask.snapshot.ref).then((downloadURL)=>{
+        console.log(downloadURL);
+    });
+    }
+   
+    );
+}
+
+
+
+//---------------------------------FUNCTIONS FOR REAL TIME DATABASE--------------------------------
+function SaveURLtoRealtimeDB(URL){
+    var name = namebox.value;
+    var ext = extlab.innerHTML;
+
+    set(ref(realdb,"ImagesLinks/" +name),{
+        ImageName: (name+ext),
+        ImgUrl: URL
+    });
+}
+
+function GetUrlFromRealtimeDB(){
+    var name = namebox.value;
+  
+    var dbRef = ref(realdb);
+
+    get(child(dbRef,"ImagesLinks/"+name)).then((snapshot)=>{
+        if(snapshot.exists()){
+            myimage.src = snapshot.val(). ImgUrl;
+        }
+    })
+}
+
+function validateName(){
+    var regex = /[\.#$\[\]]/
+    return !(regex.test(namebox.value));
+}
+
+Upbtn.onclick =  UploadProcess;
+Downbtn.onclick = GetUrlFromRealtimeDB;
+      </script>
+
+</body>
+</html>
